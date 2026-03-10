@@ -61,7 +61,17 @@
   .card-header{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
   .card-title{font-size:14px;font-weight:600;flex:1;}
   .card-action{font-size:12px;color:var(--accent);cursor:pointer;font-weight:500;}
-  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;}
+  .comercial-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+  .comercial-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 14px;position:relative;overflow:hidden;}
+  .comercial-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--c1),var(--c2));}
+  .comercial-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;}
+  .comercial-main{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;}
+  .comercial-value{font-family:'DM Serif Display',serif;font-size:26px;line-height:1;}
+  .comercial-badge{font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;}
+  .comercial-bar{height:5px;border-radius:3px;background:var(--surface2);margin-top:8px;overflow:hidden;}
+  .comercial-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--c1),var(--c2));transition:width 1s ease;}
+  .comercial-sub{font-size:11.5px;color:var(--text-muted);margin-top:6px;display:flex;justify-content:space-between;}
   .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 12px;position:relative;overflow:hidden;}
   .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
   .stat-card.green::before{background:var(--vicente);}
@@ -102,7 +112,11 @@
   .kanban-color{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
   .kanban-col-title{font-size:13px;font-weight:600;flex:1;}
   .kanban-count{font-size:11px;background:var(--surface2);color:var(--text-muted);padding:2px 7px;border-radius:20px;font-weight:600;}
-  .kanban-cards{background:var(--surface2);border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;padding:8px;flex:1;display:flex;flex-direction:column;gap:8px;min-height:80px;}
+  .kanban-cards{background:var(--surface2);border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;padding:8px;flex:1;display:flex;flex-direction:column;gap:8px;min-height:80px;transition:background 0.15s,border-color 0.15s;}
+  .kanban-cards.drag-over{background:#e8f5e9;border-color:var(--accent);}
+  .kanban-card{cursor:grab;}
+  .kanban-card.dragging{opacity:0.35;transform:rotate(1.5deg);cursor:grabbing;}
+  .kanban-card.drag-placeholder{border:2px dashed var(--accent);background:var(--accent-light);border-radius:8px;height:60px;pointer-events:none;}
   .kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all 0.15s;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
   .kanban-card:hover{box-shadow:var(--shadow);transform:translateY(-1px);border-color:var(--accent);}
   .kcard-name{font-size:13.5px;font-weight:600;margin-bottom:4px;}
@@ -281,14 +295,14 @@
         </div>
         <div class="stat-card brown">
           <div class="stat-label">Pacientes Ativos</div>
-          <div class="stat-value">248</div>
-          <div class="stat-meta"><span>↑ 8</span> este mês</div>
+          <div class="stat-value" id="dash-ativos">—</div>
+          <div class="stat-meta" id="dash-ativos-meta">carregando...</div>
           <div class="stat-sparkline-wrap"><canvas class="stat-sparkline" id="spark2"></canvas></div>
         </div>
         <div class="stat-card blue">
           <div class="stat-label">No Funil</div>
-          <div class="stat-value">34</div>
-          <div class="stat-meta">leads em aberto</div>
+          <div class="stat-value" id="dash-leads">—</div>
+          <div class="stat-meta" id="dash-leads-meta">leads em aberto</div>
           <div class="stat-sparkline-wrap"><canvas class="stat-sparkline" id="spark3"></canvas></div>
         </div>
         <div class="stat-card orange">
@@ -297,6 +311,67 @@
           <div class="stat-meta">sem resposta</div>
           <div class="stat-sparkline-wrap"><canvas class="stat-sparkline" id="spark4"></canvas></div>
         </div>
+      </div>
+
+      <!-- COMERCIAL ROW -->
+      <div class="comercial-grid">
+
+        <!-- Novos este mês vs anterior -->
+        <div class="comercial-card" style="--c1:#2d5a4e;--c2:#52a088">
+          <div class="comercial-label">📈 Novos pacientes</div>
+          <div class="comercial-main">
+            <div class="comercial-value" id="com-novos">—</div>
+            <span class="comercial-badge" id="com-novos-badge" style="background:#e8f5e9;color:#2e7d32">+0%</span>
+          </div>
+          <div class="comercial-bar"><div class="comercial-bar-fill" id="com-novos-bar" style="width:0%"></div></div>
+          <div class="comercial-sub">
+            <span>Este mês</span>
+            <span id="com-novos-ant">— mês anterior</span>
+          </div>
+        </div>
+
+        <!-- Novos vs Recorrentes -->
+        <div class="comercial-card" style="--c1:#8b5e3c;--c2:#c4946a">
+          <div class="comercial-label">🔄 Novos vs Retorno</div>
+          <div class="comercial-main">
+            <div class="comercial-value" id="com-rec-novos">—</div>
+            <span style="font-size:13px;color:var(--text-muted);margin-left:2px">novos</span>
+            <span style="font-size:13px;color:var(--text-muted);margin-left:8px" id="com-rec-ret">— retorno</span>
+          </div>
+          <div class="comercial-bar"><div class="comercial-bar-fill" id="com-rec-bar" style="width:0%"></div></div>
+          <div class="comercial-sub">
+            <span id="com-rec-pct-novo">0% novos</span>
+            <span id="com-rec-pct-ret">0% retorno</span>
+          </div>
+        </div>
+
+        <!-- Taxa de conversão leads → pacientes -->
+        <div class="comercial-card" style="--c1:#3498db;--c2:#5dade2">
+          <div class="comercial-label">🎯 Conversão leads</div>
+          <div class="comercial-main">
+            <div class="comercial-value" id="com-conv">—%</div>
+            <span style="font-size:11.5px;color:var(--text-muted);margin-left:4px">leads → pacientes</span>
+          </div>
+          <div class="comercial-bar"><div class="comercial-bar-fill" id="com-conv-bar" style="width:0%"></div></div>
+          <div class="comercial-sub">
+            <span id="com-conv-leads">— leads</span>
+            <span id="com-conv-pac">— convertidos</span>
+          </div>
+        </div>
+
+        <!-- Receita estimada -->
+        <div class="comercial-card" style="--c1:#e67e22;--c2:#f39c12">
+          <div class="comercial-label">💰 Receita estimada</div>
+          <div class="comercial-main">
+            <div class="comercial-value" id="com-receita">—</div>
+          </div>
+          <div class="comercial-bar"><div class="comercial-bar-fill" id="com-receita-bar" style="width:0%"></div></div>
+          <div class="comercial-sub">
+            <span id="com-receita-sub">este mês · R$350/consulta</span>
+            <span id="com-receita-ant">— mês ant.</span>
+          </div>
+        </div>
+
       </div>
 
       <!-- MAIN GRID: gráficos + agenda lado a lado -->
@@ -504,19 +579,36 @@
             </div>
           </div>
           <div class="sidebar-right">
+
+            <!-- Histórico de Consultas clicável -->
             <div class="card">
               <div class="card-header"><span>📋</span><span class="card-title">Histórico de Consultas</span></div>
-              <div id="pront-historico" style="padding:12px;display:flex;flex-direction:column;gap:8px"></div>
+              <div id="pront-historico" style="padding:8px;display:flex;flex-direction:column;gap:6px">
+                <div style="padding:12px;text-align:center;font-size:12px;color:var(--text-muted)">Carregando...</div>
+              </div>
             </div>
+
+            <!-- Resumo IA -->
             <div class="card">
               <div class="card-header"><span>✦</span><span class="card-title">Resumo IA</span></div>
               <div style="padding:14px">
-                <div id="pront-resumo-ia" style="background:var(--accent-light);border-radius:8px;padding:12px;font-size:12.5px;line-height:1.6;color:#1a3830">
-                  Clique em "Gerar resumo" para criar um resumo com IA.
+                <div id="pront-resumo-ia" style="background:var(--accent-light);border-radius:8px;padding:12px;font-size:12.5px;line-height:1.6;color:#1a3830;min-height:60px">
+                  Clique em "Gerar resumo" para analisar todos os dados do paciente.
                 </div>
-                <button class="btn btn-ghost" style="width:100%;margin-top:10px;font-size:12px" onclick="gerarResumoIA()">✦ Gerar resumo IA</button>
+                <button class="btn btn-ghost" style="width:100%;margin-top:10px;font-size:12px" onclick="gerarResumoIA()">✦ Gerar resumo completo</button>
               </div>
             </div>
+
+            <!-- Receita médica -->
+            <div class="card">
+              <div class="card-header"><span>📝</span><span class="card-title">Receita Médica</span></div>
+              <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+                <div style="font-size:12px;color:var(--text-muted);line-height:1.5">Gera receita com os dados da prescrição atual e informações da clínica.</div>
+                <button class="btn btn-primary" style="font-size:12.5px" onclick="abrirPreviewReceita()">📄 Gerar receita</button>
+              </div>
+            </div>
+
+            <!-- WhatsApp -->
             <div class="card">
               <div class="card-header"><span>💬</span><span class="card-title">WhatsApp</span></div>
               <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
@@ -525,6 +617,7 @@
                 <button class="btn btn-ghost" style="font-size:12px;justify-content:flex-start" onclick="navigate('whatsapp',null)">✉️ Abrir conversa</button>
               </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -670,8 +763,165 @@
 <div id="modal-new" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal">
     <div class="modal-header"><div class="modal-title">Novo Paciente / Lead</div><div class="modal-close" onclick="document.getElementById('modal-new').classList.remove('open')">✕</div></div>
-    <div class="modal-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="form-group" style="grid-column:span 2"><label class="form-label">Nome completo</label><input id="new-nome" class="form-input" placeholder="Nome do paciente"></div><div class="form-group"><label class="form-label">Telefone / WhatsApp</label><input id="new-tel" class="form-input" placeholder="(11) 9xxxx-xxxx"></div><div class="form-group"><label class="form-label">Data de nascimento</label><input id="new-nasc" class="form-input" type="date"></div><div class="form-group"><label class="form-label">Profissional</label><select id="new-prof" class="form-select"><option value="00000000-0000-0000-0000-000000000001">Dr. Vicente (Neurologista)</option><option value="00000000-0000-0000-0000-000000000002">Dra. Iara (Neuropsicóloga)</option></select></div><div class="form-group"><label class="form-label">Como chegou</label><select id="new-origem" class="form-select"><option value="whatsapp">WhatsApp</option><option value="indicacao">Indicação</option><option value="instagram">Instagram</option><option value="google">Google</option><option value="telefone">Telefone</option></select></div><div class="form-group" style="grid-column:span 2"><label class="form-label">Queixa / Motivo</label><textarea id="new-queixa" class="form-textarea" placeholder="Motivo da consulta..." style="min-height:60px"></textarea></div></div></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="grid-column:span 2"><label class="form-label">Nome completo</label><input id="new-nome" class="form-input" placeholder="Nome do paciente"></div>
+        <div class="form-group"><label class="form-label">Telefone / WhatsApp</label><input id="new-tel" class="form-input" placeholder="(11) 9xxxx-xxxx"></div>
+        <div class="form-group"><label class="form-label">Data de nascimento</label><input id="new-nasc" class="form-input" type="date"></div>
+        <div class="form-group"><label class="form-label">Profissional</label><select id="new-prof" class="form-select"><option value="00000000-0000-0000-0000-000000000001">Dr. Vicente (Neurologista)</option><option value="00000000-0000-0000-0000-000000000002">Dra. Iara (Neuropsicóloga)</option></select></div>
+        <div class="form-group"><label class="form-label">Como chegou</label><select id="new-origem" class="form-select"><option value="whatsapp">WhatsApp</option><option value="indicacao">Indicação</option><option value="instagram">Instagram</option><option value="google">Google</option><option value="telefone">Telefone</option></select></div>
+
+        <!-- NOVOS CAMPOS COMERCIAIS -->
+        <div class="form-group" style="grid-column:span 2">
+          <label class="form-label">Forma de pagamento</label>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;transition:all 0.12s" id="label-particular">
+              <input type="radio" name="new-pagamento" id="new-particular" value="particular" style="accent-color:var(--accent)" checked onchange="setPagamento('particular')"> Particular
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;transition:all 0.12s" id="label-convenio">
+              <input type="radio" name="new-pagamento" id="new-convenio-radio" value="convenio" style="accent-color:var(--accent)" onchange="setPagamento('convenio')"> Convênio
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="field-convenio-nome" style="grid-column:span 2;display:none">
+          <label class="form-label">Nome do convênio</label>
+          <input id="new-convenio-nome" class="form-input" placeholder="Ex: Unimed, Amil, SulAmérica...">
+        </div>
+
+        <div class="form-group" style="grid-column:span 2">
+          <label class="form-label">Tipo de atendimento</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;white-space:nowrap" id="label-tipo-consulta">
+              <input type="radio" name="new-tipo" id="new-tipo-consulta" value="consulta" style="accent-color:var(--accent)" checked onchange="setTipo('consulta')"> 🩺 Só consulta
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;white-space:nowrap" id="label-tipo-consulta_exame">
+              <input type="radio" name="new-tipo" id="new-tipo-consulta_exame" value="consulta_exame" style="accent-color:var(--accent)" onchange="setTipo('consulta_exame')"> 🩺🔬 Consulta + Exame
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;white-space:nowrap" id="label-tipo-exame">
+              <input type="radio" name="new-tipo" id="new-tipo-exame" value="exame" style="accent-color:var(--accent)" onchange="setTipo('exame')"> 🔬 Só exame
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Valor estimado (R$)</label>
+          <input id="new-valor" class="form-input" type="number" placeholder="350,00" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status do pagamento</label>
+          <select id="new-status-pgto" class="form-select">
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+            <option value="parcial">Parcial</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="grid-column:span 2"><label class="form-label">Queixa / Motivo</label><textarea id="new-queixa" class="form-textarea" placeholder="Motivo da consulta..." style="min-height:60px"></textarea></div>
+      </div>
+    </div>
     <div class="modal-footer"><button class="btn btn-ghost" onclick="document.getElementById('modal-new').classList.remove('open')">Cancelar</button><button class="btn btn-primary" onclick="criarPaciente()">Criar paciente</button></div>
+  </div>
+</div>
+
+<!-- MODAL RECEITA -->
+<div id="modal-receita" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')" style="align-items:flex-start;padding:40px 20px;overflow-y:auto">
+  <div class="modal" style="max-width:680px;width:100%">
+    <div class="modal-header">
+      <div class="modal-title">📄 Preview — Receita Médica</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary" style="font-size:12px" onclick="imprimirReceita()">🖨️ Imprimir</button>
+        <div class="modal-close" onclick="document.getElementById('modal-receita').classList.remove('open')">✕</div>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <!-- Preview da receita -->
+      <div id="receita-preview" style="background:#fff;padding:40px 48px;font-family:'DM Sans',sans-serif;color:#1a1714;min-height:600px">
+
+        <!-- Cabeçalho clínica -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid #2d5a4e;margin-bottom:24px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div style="width:52px;height:52px;border-radius:12px;background:#2d5a4e;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;color:#fff;font-size:18px;font-weight:700">N</div>
+            <div>
+              <div style="font-family:'DM Serif Display',serif;font-size:20px;font-weight:700;color:#2d5a4e">NeuroClínica</div>
+              <div style="font-size:11px;color:#666;margin-top:2px">Neurologia & Neuropsicologia</div>
+            </div>
+          </div>
+          <div style="text-align:right;font-size:11px;color:#666;line-height:1.8">
+            <div>Rua das Clínicas, 142 — São Paulo/SP</div>
+            <div>(11) 3456-7890 · clinica@neuroclinica.com.br</div>
+          </div>
+        </div>
+
+        <!-- Médico e data -->
+        <div style="display:flex;justify-content:space-between;margin-bottom:28px">
+          <div>
+            <div id="rec-medico" style="font-size:14px;font-weight:700;color:#1a1714"></div>
+            <div id="rec-crm" style="font-size:11.5px;color:#666;margin-top:2px"></div>
+            <div id="rec-especialidade" style="font-size:11.5px;color:#666"></div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11.5px;color:#666">Data de emissão</div>
+            <div id="rec-data" style="font-size:13px;font-weight:600;margin-top:2px"></div>
+            <div style="font-size:11px;color:#aaa;margin-top:2px">Validade: 30 dias</div>
+          </div>
+        </div>
+
+        <!-- Paciente -->
+        <div style="background:#f5f3ef;border-radius:8px;padding:14px 18px;margin-bottom:24px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:6px">Paciente</div>
+          <div style="display:flex;gap:40px">
+            <div><div id="rec-paciente" style="font-size:15px;font-weight:600"></div><div id="rec-paciente-info" style="font-size:11.5px;color:#666;margin-top:2px"></div></div>
+          </div>
+        </div>
+
+        <!-- Prescrição -->
+        <div style="margin-bottom:32px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:12px">Prescrição</div>
+          <div id="rec-prescricao" style="font-size:13.5px;line-height:2;color:#1a1714;white-space:pre-wrap;padding-left:8px;border-left:3px solid #2d5a4e"></div>
+        </div>
+
+        <!-- Diagnóstico / CID -->
+        <div style="font-size:11.5px;color:#888;margin-bottom:40px">
+          <span style="font-weight:600">Diagnóstico:</span> <span id="rec-cid"></span>
+        </div>
+
+        <!-- Assinatura -->
+        <div style="display:flex;justify-content:flex-end;margin-top:20px">
+          <div style="text-align:center;border-top:1px solid #333;padding-top:10px;min-width:240px">
+            <div id="rec-assinatura" style="font-family:'DM Serif Display',serif;font-size:15px;font-weight:700"></div>
+            <div id="rec-crm2" style="font-size:11px;color:#666;margin-top:3px"></div>
+          </div>
+        </div>
+
+        <!-- Rodapé -->
+        <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e2ddd6;font-size:10px;color:#aaa;text-align:center;line-height:1.6">
+          Documento emitido eletronicamente pelo sistema NeuroClínica CRM · Válido por 30 dias · Rua das Clínicas, 142 — São Paulo/SP
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONSULTA HISTORICO -->
+<div id="modal-consulta-hist" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header">
+      <div class="modal-title" id="mch-titulo">Consulta — </div>
+      <div class="modal-close" onclick="document.getElementById('modal-consulta-hist').classList.remove('open')">✕</div>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:4px">Data</div><div id="mch-data" style="font-size:13.5px;font-weight:500"></div></div>
+        <div><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:4px">Profissional</div><div id="mch-prof" style="font-size:13.5px;font-weight:500"></div></div>
+        <div><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:4px">Tipo</div><div id="mch-tipo" style="font-size:13.5px;font-weight:500"></div></div>
+        <div><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:4px">Status</div><div id="mch-status" style="font-size:13.5px;font-weight:500"></div></div>
+      </div>
+      <div><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:6px">Queixa</div><div id="mch-queixa" style="font-size:13px;color:var(--text-muted);line-height:1.5"></div></div>
+      <div><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:6px">Diagnóstico</div><div id="mch-cid" style="font-size:13px;color:var(--text-muted)"></div></div>
+      <div><div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:6px">Conduta / Prescrição</div><div id="mch-conduta" style="font-size:13px;color:var(--text-muted);line-height:1.6;white-space:pre-wrap"></div></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="document.getElementById('modal-consulta-hist').classList.remove('open')">Fechar</button></div>
   </div>
 </div>
 
@@ -991,18 +1241,47 @@ function toast(msg, tipo='ok'){
 }
 
 // ── 1. CRIAR PACIENTE / LEAD ──────────────────
+// Helpers dos novos campos do modal
+function setPagamento(tipo){
+  document.getElementById('label-particular').style.background    = tipo==='particular' ? 'var(--accent-light)' : '';
+  document.getElementById('label-particular').style.borderColor   = tipo==='particular' ? 'var(--accent)' : 'var(--border)';
+  document.getElementById('label-convenio').style.background      = tipo==='convenio'   ? 'var(--accent-light)' : '';
+  document.getElementById('label-convenio').style.borderColor     = tipo==='convenio'   ? 'var(--accent)' : 'var(--border)';
+  document.getElementById('field-convenio-nome').style.display    = tipo==='convenio'   ? 'block' : 'none';
+}
+function setTipo(tipo){
+  ['consulta','consulta_exame','exame'].forEach(t => {
+    const el = document.getElementById('label-tipo-'+t);
+    if(el){
+      el.style.background   = t===tipo ? 'var(--accent-light)' : '';
+      el.style.borderColor  = t===tipo ? 'var(--accent)' : 'var(--border)';
+    }
+  });
+}
+// Inicializa estados visuais ao abrir o modal
+document.getElementById('modal-new').addEventListener('click', () => {
+  setPagamento('particular'); setTipo('consulta');
+});
+
 async function criarPaciente(){
   const nomeCompleto = document.getElementById('new-nome').value.trim();
   if(!nomeCompleto){ toast('Digite o nome do paciente','erro'); return; }
 
-  const partes = nomeCompleto.split(' ');
-  const nome = partes[0];
+  const partes    = nomeCompleto.split(' ');
+  const nome      = partes[0];
   const sobrenome = partes.slice(1).join(' ') || '—';
-  const tel = document.getElementById('new-tel').value.trim();
-  const nasc = document.getElementById('new-nasc').value || null;
-  const profId = document.getElementById('new-prof').value;
-  const origem = document.getElementById('new-origem').value;
-  const queixa = document.getElementById('new-queixa').value.trim();
+  const tel       = document.getElementById('new-tel').value.trim();
+  const nasc      = document.getElementById('new-nasc').value || null;
+  const profId    = document.getElementById('new-prof').value;
+  const origem    = document.getElementById('new-origem').value;
+  const queixa    = document.getElementById('new-queixa').value.trim();
+
+  // Novos campos comerciais
+  const pagamento   = document.querySelector('input[name="new-pagamento"]:checked')?.value || 'particular';
+  const convenioNome= document.getElementById('new-convenio-nome').value.trim();
+  const tipoAtend   = document.querySelector('input[name="new-tipo"]:checked')?.value || 'consulta';
+  const valor       = parseFloat(document.getElementById('new-valor').value) || null;
+  const statusPgto  = document.getElementById('new-status-pgto').value;
 
   const btn = document.querySelector('#modal-new .btn-primary');
   btn.textContent = 'Salvando...'; btn.disabled = true;
@@ -1013,14 +1292,17 @@ async function criarPaciente(){
     data_nascimento: nasc,
     profissional_id: profId,
     origem, status: 'lead',
-    estagio_pipeline: 'Novo Lead'
+    estagio_pipeline: 'Novo Lead',
+    convenio: pagamento === 'convenio' ? (convenioNome || 'Convênio') : 'Particular',
+    tipo_atendimento: tipoAtend,
+    valor_consulta: valor,
+    status_pagamento: statusPgto,
   }]).select().single();
 
   btn.textContent = 'Criar paciente'; btn.disabled = false;
 
   if(error){ toast('Erro ao salvar: ' + error.message, 'erro'); return; }
 
-  // Registra interação inicial
   if(queixa){
     await sb.from('interacoes').insert([{
       paciente_id: data.id,
@@ -1032,12 +1314,13 @@ async function criarPaciente(){
   }
 
   document.getElementById('modal-new').classList.remove('open');
-  // Limpa campos
-  ['new-nome','new-tel','new-queixa'].forEach(id => document.getElementById(id).value='');
+  ['new-nome','new-tel','new-queixa','new-convenio-nome','new-valor'].forEach(id => document.getElementById(id).value='');
   document.getElementById('new-nasc').value='';
+  document.getElementById('new-status-pgto').value='pendente';
 
   toast(`✓ ${nome} ${sobrenome} adicionado ao pipeline!`);
-  carregarPacientes(); // atualiza tabela se estiver na aba
+  carregarKanban();
+  carregarPacientes();
 }
 
 // ── 2. CARREGAR PACIENTES (tabela) ────────────
@@ -1094,7 +1377,7 @@ async function carregarKanban(){
 
   const { data, error } = await sb
     .from('pacientes')
-    .select(`id, nome, sobrenome, whatsapp, telefone, origem, estagio_pipeline, status, created_at, profissionais(titulo, nome, cor, inicial)`)
+    .select(`id, nome, sobrenome, whatsapp, telefone, origem, estagio_pipeline, status, created_at, convenio, tipo_atendimento, valor_consulta, status_pagamento, profissionais(titulo, nome, cor, inicial)`)
     .order('created_at', { ascending: false });
 
   if(error){ toast('Erro ao carregar pipeline: ' + error.message, 'erro'); return; }
@@ -1126,25 +1409,163 @@ async function carregarKanban(){
       const tagClass = pr.inicial === 'V' ? 'tag-v' : 'tag-i';
       const icon     = ORIGEM_ICON[p.origem] || '📋';
       const data_br  = new Date(p.created_at).toLocaleDateString('pt-BR');
-      const fone     = p.whatsapp || p.telefone || '—';
+
+      // Campos comerciais
+      const isParticular = !p.convenio || p.convenio === 'Particular';
+      const pgtoLabel    = isParticular ? 'Particular' : (p.convenio || 'Convênio');
+      const pgtoBg       = isParticular ? '#fff8e1' : '#e3f2fd';
+      const pgtoCor      = isParticular ? '#f57f17' : '#1565c0';
+
+      const tipoMap = { consulta:'🩺 Consulta', consulta_exame:'🩺🔬 Consulta+Exame', exame:'🔬 Exame' };
+      const tipoLabel = tipoMap[p.tipo_atendimento] || '🩺 Consulta';
+
+      const valor = p.valor_consulta
+        ? 'R$' + Number(p.valor_consulta).toLocaleString('pt-BR', {minimumFractionDigits:0})
+        : null;
+      const pgtoStatus = { pago:'✓ Pago', pendente:'Pendente', parcial:'Parcial' };
+      const pgtoStatusCor = { pago:'#27ae60', pendente:'#e67e22', parcial:'#3498db' };
+
       return `
-        <div class="kanban-card" onclick="abrirDrawerDB('${p.id}')">
+        <div class="kanban-card" draggable="true"
+          data-id="${p.id}" data-estagio="${est.key}"
+          ondragstart="onDragStart(event,this)"
+          ondragend="onDragEnd(event,this)"
+          onclick="abrirDrawerDB('${p.id}')">
           <div class="kcard-name">${p.nome} ${p.sobrenome}</div>
-          <div class="kcard-meta">${icon} ${p.origem||'—'} · ${fone}</div>
+          <div class="kcard-meta" style="margin-bottom:8px">${icon} ${p.origem||'—'} · ${p.whatsapp||p.telefone||'—'}</div>
           <div class="kcard-tags">
-            <span class="kcard-tag" style="background:${est.tagBg};color:${est.tagCor}">${est.label}</span>
-            <span class="kcard-tag ${tagClass}">${pr.titulo||''} ${pr.nome||''}</span>
+            <span class="kcard-tag" style="background:${pgtoBg};color:${pgtoCor}">${pgtoLabel}</span>
+            <span class="kcard-tag" style="background:#f3e5f5;color:#7b1fa2">${tipoLabel}</span>
           </div>
-          <div class="kcard-footer">
-            <span class="kcard-date">${data_br}</span>
-            <span style="font-size:11px;color:var(--accent)">Ver detalhes →</span>
+          ${valor ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:7px;border-top:1px solid var(--border)">
+            <span style="font-size:13px;font-weight:700;color:var(--text)">${valor}</span>
+            <span style="font-size:10.5px;font-weight:600;color:${pgtoStatusCor[p.status_pagamento]||'#aaa'}">${pgtoStatus[p.status_pagamento]||''}</span>
+          </div>` : ''}
+          <div class="kcard-footer" style="${valor ? '' : 'margin-top:8px;padding-top:7px;border-top:1px solid var(--border)'}">
+            <span class="kcard-tag ${tagClass}" style="font-size:10px">${pr.titulo||''} ${pr.nome||''}</span>
+            <span style="font-size:11px;color:var(--accent)">Ver →</span>
           </div>
         </div>`;
     }).join('');
   });
+
+  // Ativa drop zones em todas as colunas
+  initDragDrop();
 }
 
-// Abre drawer com dados do banco
+// ── DRAG & DROP ───────────────────────────────
+let draggedCard = null;
+let dragPlaceholder = null;
+
+function onDragStart(e, el){
+  draggedCard = el;
+  // Pequeno delay para o browser renderizar o ghost antes de adicionar classe
+  setTimeout(() => el.classList.add('dragging'), 0);
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', el.dataset.id);
+}
+
+function onDragEnd(e, el){
+  el.classList.remove('dragging');
+  removePlaceholder();
+  document.querySelectorAll('.kanban-cards').forEach(c => c.classList.remove('drag-over'));
+  draggedCard = null;
+}
+
+function removePlaceholder(){
+  if(dragPlaceholder && dragPlaceholder.parentNode){
+    dragPlaceholder.parentNode.removeChild(dragPlaceholder);
+  }
+  dragPlaceholder = null;
+}
+
+function initDragDrop(){
+  document.querySelectorAll('.kanban-cards').forEach(col => {
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      col.classList.add('drag-over');
+
+      // Insere placeholder na posição certa
+      removePlaceholder();
+      dragPlaceholder = document.createElement('div');
+      dragPlaceholder.className = 'kanban-card drag-placeholder';
+
+      const afterEl = getDragAfterElement(col, e.clientY);
+      if(afterEl) col.insertBefore(dragPlaceholder, afterEl);
+      else col.appendChild(dragPlaceholder);
+    });
+
+    col.addEventListener('dragleave', e => {
+      if(!col.contains(e.relatedTarget)){
+        col.classList.remove('drag-over');
+        removePlaceholder();
+      }
+    });
+
+    col.addEventListener('drop', async e => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      removePlaceholder();
+      if(!draggedCard) return;
+
+      const pacienteId = draggedCard.dataset.id;
+      const novoEstagio = col.closest('.kanban-col')
+        ?.querySelector('.kanban-col-title')?.textContent?.trim();
+
+      if(!novoEstagio || novoEstagio === draggedCard.dataset.estagio) return;
+
+      // Atualiza banco
+      const { error } = await sb.from('pacientes')
+        .update({ estagio_pipeline: novoEstagio })
+        .eq('id', pacienteId);
+
+      if(error){
+        toast('Erro ao mover: ' + error.message, 'erro');
+        return;
+      }
+
+      // Registra interação
+      await sb.from('interacoes').insert([{
+        paciente_id: pacienteId,
+        tipo: 'mudanca_estagio',
+        titulo: `Movido para ${novoEstagio}`,
+        descricao: `Arrastado de ${draggedCard.dataset.estagio} → ${novoEstagio}`,
+        autor: 'recepção'
+      }]);
+
+      // Atualiza card na UI sem reload completo
+      draggedCard.dataset.estagio = novoEstagio;
+      col.appendChild(draggedCard);
+
+      // Atualiza contadores
+      atualizarContadoresKanban();
+      toast(`✓ Movido para ${novoEstagio}`);
+    });
+  });
+}
+
+function getDragAfterElement(container, y){
+  const cards = [...container.querySelectorAll('.kanban-card:not(.dragging):not(.drag-placeholder)')];
+  return cards.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if(offset < 0 && offset > closest.offset){
+      return { offset, element: child };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function atualizarContadoresKanban(){
+  ESTAGIOS.forEach(est => {
+    const col   = document.getElementById('kcol-'+est.idx);
+    const count = document.getElementById('kcount-'+est.idx);
+    if(col && count){
+      count.textContent = col.querySelectorAll('.kanban-card:not(.drag-placeholder)').length;
+    }
+  });
+}
 let currentDrawerPacienteId = null;
 async function abrirDrawerDB(pacienteId){
   currentDrawerPacienteId = pacienteId;
@@ -1280,19 +1701,39 @@ async function abrirProntuario(pacienteId){
     document.getElementById('pront-retorno').value = '';
   }
 
-  // Histórico de interações
-  const { data: interacoes } = await sb.from('interacoes')
-    .select('*').eq('paciente_id', pacienteId)
-    .order('created_at', { ascending: false }).limit(8);
+  // Histórico de consultas clicável
+  const { data: consultas } = await sb.from('consultas')
+    .select(`*, profissionais(titulo, nome), prontuarios(queixa_principal, hipotese_diagnostica, conduta)`)
+    .eq('paciente_id', pacienteId)
+    .order('data_hora_inicio', { ascending: false }).limit(10);
 
   const hist = document.getElementById('pront-historico');
-  hist.innerHTML = (interacoes||[]).length === 0
-    ? '<div style="font-size:12.5px;color:var(--text-muted)">Nenhum histórico ainda.</div>'
-    : (interacoes||[]).map(i => `
-        <div style="padding:9px;border-radius:7px;background:var(--accent-light)">
-          <div style="font-size:12px;font-weight:600">${new Date(i.created_at).toLocaleDateString('pt-BR')}</div>
-          <div style="font-size:11.5px;color:var(--text-muted)">${i.titulo}</div>
-        </div>`).join('');
+  if(!consultas || consultas.length === 0){
+    hist.innerHTML = '<div style="padding:12px;font-size:12.5px;color:var(--text-muted)">Nenhuma consulta registrada.</div>';
+  } else {
+    hist.innerHTML = consultas.map(c => {
+      const data = new Date(c.data_hora_inicio).toLocaleDateString('pt-BR');
+      const hora = new Date(c.data_hora_inicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      const pr   = c.profissionais || {};
+      const pront= c.prontuarios || {};
+      const tipoLabel = { primeira_consulta:'1ª Consulta', retorno:'Retorno', avaliacao:'Avaliação', sessao:'Sessão' };
+      const statusColor = { realizada:'#27ae60', agendada:'#3498db', cancelada:'#e74c3c', falta:'#e67e22' };
+      const tagClass = pr.inicial==='V' ? 'tag-v' : 'tag-i';
+      return `<div onclick="abrirConsultaHistorico('${c.id}')" style="padding:10px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);cursor:pointer;transition:all 0.12s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12.5px;font-weight:600">${data} · ${hora}</div>
+          <div style="width:8px;height:8px;border-radius:50%;background:${statusColor[c.status]||'#aaa'}"></div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="agenda-tag ${tagClass}" style="font-size:10px;padding:1px 6px">${pr.titulo||''} ${pr.nome||''}</span>
+          <span style="font-size:11px;color:var(--text-muted)">${tipoLabel[c.tipo]||c.tipo||'—'}</span>
+        </div>
+        ${pront.hipotese_diagnostica ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pront.hipotese_diagnostica}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  // Guarda consultas para uso no resumo IA
+  window._prontuarioConsultas = consultas || [];
 }
 
 // ── 5. SALVAR PRONTUÁRIO ──────────────────────
@@ -1347,38 +1788,168 @@ async function salvarProntuario(){
   toast('✓ Prontuário salvo com sucesso!');
 }
 
-// ── GERAR RESUMO IA ───────────────────────────
+// ── GERAR RESUMO IA (cruzamento completo) ─────
 async function gerarResumoIA(){
   if(!currentProntuarioPacienteId) return;
+
+  const el = document.getElementById('pront-resumo-ia');
+  el.innerHTML = '<span style="color:var(--text-muted)">⏳ Analisando todos os dados do paciente...</span>';
+
+  // Coleta todos os dados disponíveis
+  const nome    = document.getElementById('pront-nome').value;
+  const nasc    = document.getElementById('pront-nasc').value;
   const queixa  = document.getElementById('pront-queixa').value;
   const cid     = document.getElementById('pront-cid').value;
   const conduta = document.getElementById('pront-conduta').value;
-  const nome    = document.getElementById('pront-nome').value;
+  const convenio= document.getElementById('pront-convenio').value;
 
-  const el = document.getElementById('pront-resumo-ia');
-  el.textContent = 'Gerando resumo...';
+  // Calcula idade
+  const idade = nasc ? Math.floor((new Date() - new Date(nasc)) / 31557600000) + ' anos' : 'não informada';
+
+  // Monta histórico de consultas
+  const consultas = window._prontuarioConsultas || [];
+  const histStr = consultas.length === 0
+    ? 'Nenhuma consulta registrada.'
+    : consultas.map((c,i) => {
+        const data  = new Date(c.data_hora_inicio).toLocaleDateString('pt-BR');
+        const pr    = c.profissionais?.nome || '';
+        const pront = c.prontuarios || {};
+        return `Consulta ${i+1} (${data} - ${pr}):
+  - Queixa: ${pront.queixa_principal || '—'}
+  - Diagnóstico: ${pront.hipotese_diagnostica || '—'}
+  - Conduta: ${pront.conduta || '—'}`;
+      }).join('\n\n');
+
+  // Busca interações
+  const { data: interacoes } = await sb.from('interacoes')
+    .select('titulo, descricao, created_at')
+    .eq('paciente_id', currentProntuarioPacienteId)
+    .order('created_at', { ascending: false }).limit(10);
+  const interStr = (interacoes||[]).map(i =>
+    `${new Date(i.created_at).toLocaleDateString('pt-BR')}: ${i.titulo}`
+  ).join('\n') || 'Nenhuma interação registrada.';
+
+  const prompt = `Você é um assistente clínico especializado em neurologia e neuropsicologia. Analise todos os dados do paciente abaixo e gere um resumo clínico estruturado em português com insights relevantes.
+
+DADOS DO PACIENTE:
+Nome: ${nome}
+Idade: ${idade}
+Convênio: ${convenio || 'não informado'}
+Queixa atual: ${queixa || 'não informada'}
+Diagnóstico/CID: ${cid || 'não informado'}
+Conduta atual: ${conduta || 'não informada'}
+
+HISTÓRICO DE CONSULTAS (${consultas.length} consultas):
+${histStr}
+
+HISTÓRICO DE INTERAÇÕES:
+${interStr}
+
+Gere um resumo com:
+1. **Perfil clínico** — síntese do quadro atual em 1-2 frases
+2. **Evolução** — como o paciente evoluiu entre as consultas
+3. **Pontos de atenção** — alertas ou padrões relevantes
+4. **Sugestão** — próximo passo clínico recomendado
+
+Seja objetivo e use linguagem clínica. Máximo 200 palavras.`;
 
   const resp = await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
-      model:'claude-sonnet-4-20250514', max_tokens:300,
-      system:'Você é um assistente médico. Gere um resumo clínico conciso em 2-3 frases, em português.',
-      messages:[{role:'user', content:`Paciente: ${nome}\nQueixa: ${queixa}\nDiagnóstico: ${cid}\nConduta: ${conduta}\n\nGere um resumo clínico objetivo.`}]
+      model:'claude-sonnet-4-20250514', max_tokens:600,
+      messages:[{role:'user', content: prompt}]
     })
   });
   const data = await resp.json();
   const resumo = data.content?.[0]?.text || 'Não foi possível gerar o resumo.';
-  el.textContent = resumo;
+
+  // Formata markdown básico
+  el.innerHTML = resumo
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
 
   // Salva no banco
-  if(currentProntuarioPacienteId){
-    const { data: existing } = await sb.from('prontuarios')
-      .select('id').eq('paciente_id', currentProntuarioPacienteId).limit(1).single();
-    if(existing){
-      await sb.from('prontuarios').update({ resumo_ia: resumo, resumo_gerado_em: new Date().toISOString() }).eq('id', existing.id);
-    }
+  const { data: existing } = await sb.from('prontuarios')
+    .select('id').eq('paciente_id', currentProntuarioPacienteId).limit(1).single();
+  if(existing){
+    await sb.from('prontuarios').update({
+      resumo_ia: resumo,
+      resumo_gerado_em: new Date().toISOString()
+    }).eq('id', existing.id);
   }
+}
+
+// ── ABRIR PREVIEW RECEITA ─────────────────────
+function abrirPreviewReceita(){
+  if(!currentProntuarioPacienteId){ toast('Nenhum paciente selecionado','erro'); return; }
+
+  const nomePaciente = document.getElementById('pront-nome').value;
+  const nasc         = document.getElementById('pront-nasc').value;
+  const convenio     = document.getElementById('pront-convenio').value;
+  const prescricao   = document.getElementById('pront-conduta').value;
+  const cid          = document.getElementById('pront-cid').value;
+
+  // Dados clínica / médico (em produção viriam do banco via login)
+  const medico       = 'Dr. Vicente Schiavão';
+  const crm          = 'CRM-SP 123.456';
+  const especialidade= 'Neurologista';
+
+  const idade = nasc
+    ? Math.floor((new Date() - new Date(nasc)) / 31557600000) + ' anos'
+    : '';
+
+  const hoje = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+
+  document.getElementById('rec-medico').textContent      = medico;
+  document.getElementById('rec-crm').textContent         = crm;
+  document.getElementById('rec-especialidade').textContent = especialidade;
+  document.getElementById('rec-data').textContent        = hoje;
+  document.getElementById('rec-paciente').textContent    = nomePaciente;
+  document.getElementById('rec-paciente-info').textContent = [idade, convenio].filter(Boolean).join(' · ');
+  document.getElementById('rec-prescricao').textContent  = prescricao || '—';
+  document.getElementById('rec-cid').textContent         = cid || '—';
+  document.getElementById('rec-assinatura').textContent  = medico;
+  document.getElementById('rec-crm2').textContent        = crm + ' · ' + especialidade;
+
+  document.getElementById('modal-receita').classList.add('open');
+}
+
+function imprimirReceita(){
+  const conteudo = document.getElementById('receita-preview').innerHTML;
+  const win = window.open('','_blank','width=800,height=900');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <title>Receita Médica</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>body{margin:0;padding:40px;font-family:'DM Sans',sans-serif;color:#1a1714}@media print{body{padding:20px}}</style>
+  </head><body>${conteudo}<script>window.onload=()=>window.print()<\/script></body></html>`);
+  win.document.close();
+}
+
+// ── ABRIR CONSULTA DO HISTÓRICO ───────────────
+async function abrirConsultaHistorico(consultaId){
+  const { data: c } = await sb.from('consultas')
+    .select(`*, profissionais(titulo, nome), prontuarios(queixa_principal, hipotese_diagnostica, conduta)`)
+    .eq('id', consultaId).single();
+  if(!c) return;
+
+  const data = new Date(c.data_hora_inicio).toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+  const hora = new Date(c.data_hora_inicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const pr   = c.profissionais || {};
+  const pront= c.prontuarios  || {};
+  const tipoLabel = { primeira_consulta:'Primeira Consulta', retorno:'Retorno', avaliacao:'Avaliação', sessao:'Sessão' };
+  const statusLabel = { realizada:'Realizada ✓', agendada:'Agendada', cancelada:'Cancelada', falta:'Falta' };
+
+  document.getElementById('mch-titulo').textContent  = `Consulta — ${new Date(c.data_hora_inicio).toLocaleDateString('pt-BR')}`;
+  document.getElementById('mch-data').textContent    = `${data} às ${hora}`;
+  document.getElementById('mch-prof').textContent    = `${pr.titulo||''} ${pr.nome||'—'}`;
+  document.getElementById('mch-tipo').textContent    = tipoLabel[c.tipo] || c.tipo || '—';
+  document.getElementById('mch-status').textContent  = statusLabel[c.status] || c.status || '—';
+  document.getElementById('mch-queixa').textContent  = pront.queixa_principal || '—';
+  document.getElementById('mch-cid').textContent     = pront.hipotese_diagnostica || '—';
+  document.getElementById('mch-conduta').textContent = pront.conduta || '—';
+
+  document.getElementById('modal-consulta-hist').classList.add('open');
 }
 
 // WhatsApp drawer helper
@@ -1389,10 +1960,98 @@ function abrirWhatsAppDrawer(){
 // Botão salvar prontuário
 document.querySelector('#page-prontuario .btn-primary')?.addEventListener('click', salvarProntuario);
 
+// ── MÉTRICAS COMERCIAIS DO DASHBOARD ─────────
+async function carregarMetricasDashboard(){
+  const agora    = new Date();
+  const iniMes   = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString();
+  const iniMesAnt= new Date(agora.getFullYear(), agora.getMonth()-1, 1).toISOString();
+  const fimMesAnt= new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59).toISOString();
+
+  // Busca todos os pacientes
+  const { data: todos } = await sb.from('pacientes').select('id, status, created_at');
+  if(!todos) return;
+
+  const total      = todos.length;
+  const ativos     = todos.filter(p => p.status === 'ativo' || p.status === 'retorno').length;
+  const leads      = todos.filter(p => p.status === 'lead' || p.status === 'novo').length;
+  const novosMes   = todos.filter(p => p.created_at >= iniMes).length;
+  const novosMesAnt= todos.filter(p => p.created_at >= iniMesAnt && p.created_at <= fimMesAnt).length;
+
+  // Novos vs Recorrentes este mês
+  const totalMes     = todos.filter(p => p.created_at >= iniMes).length;
+  const retornoMes   = ativos; // pacientes ativos = recorrentes
+
+  // Conversão: leads que viraram pacientes / total leads criados
+  const totalLeadsCriados = todos.filter(p => p.origem !== null).length;
+  const convertidos       = todos.filter(p => ['ativo','retorno','alta'].includes(p.status)).length;
+  const taxaConv          = totalLeadsCriados > 0 ? Math.round((convertidos / totalLeadsCriados) * 100) : 0;
+
+  // Receita estimada (R$350 por consulta)
+  const TICKET = 350;
+  const { data: consultasMes } = await sb.from('consultas')
+    .select('id').eq('status','realizada')
+    .gte('data_hora_inicio', iniMes);
+  const { data: consultasMesAnt } = await sb.from('consultas')
+    .select('id').eq('status','realizada')
+    .gte('data_hora_inicio', iniMesAnt)
+    .lte('data_hora_inicio', fimMesAnt);
+
+  const nConsultasMes    = consultasMes?.length    || 0;
+  const nConsultasMesAnt = consultasMesAnt?.length || 0;
+  const receitaMes       = nConsultasMes    * TICKET;
+  const receitaMesAnt    = nConsultasMesAnt * TICKET;
+
+  // Variação novos mês vs anterior
+  const varNovos = novosMesAnt > 0
+    ? Math.round(((novosMes - novosMesAnt) / novosMesAnt) * 100)
+    : novosMes > 0 ? 100 : 0;
+
+  // Atualiza cards operacionais
+  document.getElementById('dash-ativos').textContent = ativos;
+  document.getElementById('dash-ativos-meta').innerHTML = `<span style="color:var(--success);font-weight:600">↑ ${novosMes}</span> novos este mês`;
+  document.getElementById('dash-leads').textContent = leads;
+
+  // Card 1 — Novos pacientes
+  document.getElementById('com-novos').textContent = novosMes;
+  const badge = document.getElementById('com-novos-badge');
+  badge.textContent = (varNovos >= 0 ? '+' : '') + varNovos + '%';
+  badge.style.background = varNovos >= 0 ? '#e8f5e9' : '#fdecea';
+  badge.style.color       = varNovos >= 0 ? '#2e7d32' : '#c0392b';
+  document.getElementById('com-novos-ant').textContent = novosMesAnt + ' mês anterior';
+  const pctNovosBar = novosMesAnt > 0 ? Math.min(100, Math.round((novosMes / Math.max(novosMes, novosMesAnt)) * 100)) : 100;
+  document.getElementById('com-novos-bar').style.width = pctNovosBar + '%';
+
+  // Card 2 — Novos vs Recorrentes
+  document.getElementById('com-rec-novos').textContent = novosMes;
+  document.getElementById('com-rec-ret').textContent   = retornoMes + ' retorno';
+  const totalNR = novosMes + retornoMes || 1;
+  const pctNovo = Math.round((novosMes / totalNR) * 100);
+  const pctRet  = 100 - pctNovo;
+  document.getElementById('com-rec-pct-novo').textContent = pctNovo + '% novos';
+  document.getElementById('com-rec-pct-ret').textContent  = pctRet  + '% retorno';
+  document.getElementById('com-rec-bar').style.width = pctNovo + '%';
+
+  // Card 3 — Conversão
+  document.getElementById('com-conv').textContent        = taxaConv + '%';
+  document.getElementById('com-conv-leads').textContent  = totalLeadsCriados + ' leads total';
+  document.getElementById('com-conv-pac').textContent    = convertidos + ' convertidos';
+  document.getElementById('com-conv-bar').style.width    = taxaConv + '%';
+
+  // Card 4 — Receita
+  const fmt = v => v >= 1000
+    ? 'R$' + (v/1000).toFixed(1).replace('.',',') + 'k'
+    : 'R$' + v.toLocaleString('pt-BR');
+  document.getElementById('com-receita').textContent     = fmt(receitaMes);
+  document.getElementById('com-receita-ant').textContent = fmt(receitaMesAnt) + ' ant.';
+  const pctReceita = receitaMesAnt > 0 ? Math.min(100, Math.round((receitaMes / Math.max(receitaMes, receitaMesAnt)) * 100)) : receitaMes > 0 ? 100 : 30;
+  document.getElementById('com-receita-bar').style.width = pctReceita + '%';
+}
+
 // Inicializa dados do banco ao carregar
 window.addEventListener('load', () => {
   carregarPacientes();
   carregarKanban();
+  carregarMetricasDashboard();
 });
 </script>
 </body>
