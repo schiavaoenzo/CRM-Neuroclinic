@@ -174,7 +174,8 @@
   .status-novo{background:#e3f2fd;color:#1565c0;}
   .status-inativo{background:var(--surface2);color:var(--text-muted);}
   /* WHATSAPP */
-  .wa-layout{display:grid;grid-template-columns:300px 1fr;gap:0;height:calc(100vh - 165px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .wa-layout{display:grid;grid-template-columns:300px 1fr;grid-template-rows:1fr;gap:0;height:calc(100vh - 165px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .wa-sidebar{min-height:0;overflow:hidden;}
   .wa-sidebar{border-right:1px solid var(--border);display:flex;flex-direction:column;}
   .wa-sidebar-header{padding:16px;border-bottom:1px solid var(--border);}
   .wa-search{display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;gap:8px;margin-top:10px;}
@@ -682,7 +683,7 @@
 
     <!-- MODAL NOVA CONVERSA WA -->
     <div id="modal-nova-conversa-wa" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
-      <div class="modal-box" style="max-width:500px">
+      <div class="modal" style="width:500px">
         <div class="modal-header"><span class="modal-title">💬 Nova conversa WhatsApp</span><div class="modal-close" onclick="document.getElementById('modal-nova-conversa-wa').classList.remove('open')">✕</div></div>
         <div class="modal-body" style="display:flex;flex-direction:column;gap:16px">
 
