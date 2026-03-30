@@ -651,26 +651,50 @@
 
     <!-- WHATSAPP -->
     <div id="page-whatsapp" class="page">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><h2 style="font-family:'DM Serif Display',serif;font-size:22px">WhatsApp Clínica</h2><div style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-ghost" style="font-size:12.5px">Templates</button><button class="btn btn-primary" style="font-size:12.5px">+ Nova conversa</button></div></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <h2 style="font-family:'DM Serif Display',serif;font-size:22px">WhatsApp Clínica</h2>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost" style="font-size:12.5px" onclick="carregarChatsWA()">🔄 Atualizar</button>
+          <button class="btn btn-primary" style="font-size:12.5px" onclick="abrirNovaConversaWA()">+ Nova conversa</button>
+        </div>
+      </div>
       <div class="wa-layout">
         <div class="wa-sidebar">
-          <div class="wa-sidebar-header"><div style="font-size:13.5px;font-weight:600">Conversas</div><div class="wa-search"><span style="font-size:13px;color:var(--text-muted)">⌕</span><input type="text" placeholder="Buscar..."></div></div>
-          <div class="wa-conversations">
-            <div class="wa-conv-item active"><div class="wa-avatar" style="background:var(--accent)">AB</div><div class="wa-conv-info"><div class="wa-conv-name">Ana Beatriz Souza</div><div class="wa-conv-preview">Doutora, tudo bem? Queria confirmar...</div></div><div class="wa-conv-meta"><div class="wa-conv-time">09:31</div><div class="wa-unread">2</div></div></div>
-            <div class="wa-conv-item"><div class="wa-avatar" style="background:#3498db">LM</div><div class="wa-conv-info"><div class="wa-conv-name">Lucas Mendes (mãe)</div><div class="wa-conv-preview">Confirmado para amanhã ✓</div></div><div class="wa-conv-meta"><div class="wa-conv-time">08:15</div></div></div>
-            <div class="wa-conv-item"><div class="wa-avatar" style="background:#e67e22">PA</div><div class="wa-conv-info"><div class="wa-conv-name">Pedro Almeida</div><div class="wa-conv-preview">Olá, gostaria de marcar uma consulta</div></div><div class="wa-conv-meta"><div class="wa-conv-time">Ontem</div><div class="wa-unread">1</div></div></div>
-            <div class="wa-conv-item"><div class="wa-avatar" style="background:#9b59b6">RL</div><div class="wa-conv-info"><div class="wa-conv-name">Roberto Lima</div><div class="wa-conv-preview">🤖 Lembrete enviado automaticamente</div></div><div class="wa-conv-meta"><div class="wa-conv-time">Ontem</div></div></div>
+          <div class="wa-sidebar-header">
+            <div style="font-size:13.5px;font-weight:600">Conversas</div>
+            <div class="wa-search"><span style="font-size:13px;color:var(--text-muted)">⌕</span><input type="text" id="wa-search-input" placeholder="Buscar..." oninput="filtrarChatsWA(this.value)"></div>
+          </div>
+          <div class="wa-conversations" id="wa-conv-list">
+            <div style="padding:32px 16px;text-align:center;color:var(--text-muted);font-size:13px">⏳ Carregando conversas...</div>
           </div>
         </div>
-        <div class="wa-chat">
-          <div class="wa-chat-header"><div class="wa-avatar" style="background:var(--accent);width:38px;height:38px;font-size:13px">AB</div><div class="wa-chat-info"><div class="wa-chat-name">Ana Beatriz Souza</div><div class="wa-chat-status">Paciente · Dr. Vicente · Hoje 08:00</div></div><div style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-ghost" style="font-size:12px;padding:6px 10px">📋 Prontuário</button><button class="btn btn-ghost" style="font-size:12px;padding:6px 10px">📅 Agendar</button></div></div>
-          <div class="wa-messages">
-            <div class="wa-msg received"><div class="wa-msg-tag">🤖 Automático</div>Olá, Ana Beatriz! Sua consulta com o Dr. Vicente está agendada para <strong>hoje às 08:00</strong>. Confirma sua presença?<div class="wa-msg-time">07/03 · 18:00</div></div>
-            <div class="wa-msg sent">Confirmado! Estarei lá. 👍<div class="wa-msg-time sent">07/03 · 18:23 ✓✓</div></div>
-            <div class="wa-msg received">Doutora, posso tomar um analgésico antes da consulta?<div class="wa-msg-time">08/03 · 09:31</div></div>
+        <div class="wa-chat" id="wa-chat-panel">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);gap:10px">
+            <div style="font-size:36px">💬</div>
+            <div style="font-size:14px;font-weight:500">Selecione uma conversa</div>
+            <div style="font-size:12px">ou clique em "+ Nova conversa" para iniciar</div>
           </div>
-          <div style="background:var(--surface2);padding:8px 12px;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border)"><span>✦</span><span>Sugestão IA: <em>"Pode tomar se necessário, mas anote o horário para informar ao Dr. Vicente."</em></span><button style="margin-left:auto;font-size:11.5px;padding:3px 10px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif">Usar</button></div>
-          <div class="wa-input-area"><button style="font-size:20px;background:none;border:none;cursor:pointer;color:var(--text-muted)">😊</button><textarea class="wa-input" rows="1" placeholder="Digite uma mensagem..."></textarea><button class="wa-send-btn">➤</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL NOVA CONVERSA WA -->
+    <div id="modal-nova-conversa-wa" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="modal-box" style="max-width:420px">
+        <div class="modal-header"><span class="modal-title">💬 Nova conversa</span><div class="modal-close" onclick="document.getElementById('modal-nova-conversa-wa').classList.remove('open')">✕</div></div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label class="form-label">Telefone (com DDD)</label>
+            <input id="nc-telefone" class="form-input" placeholder="Ex: 11 99999-9999" type="tel">
+          </div>
+          <div>
+            <label class="form-label">Mensagem inicial</label>
+            <textarea id="nc-mensagem" class="form-input" rows="3" placeholder="Digite a primeira mensagem..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="document.getElementById('modal-nova-conversa-wa').classList.remove('open')">Cancelar</button>
+          <button class="btn btn-primary" onclick="enviarNovaConversaWA()">Enviar ➤</button>
         </div>
       </div>
     </div>
@@ -1660,8 +1684,241 @@ function navigate(page,navEl){
   if(page==='pipeline-clinico')carregarPipelineClinoco();
   if(page==='pacientes')carregarPacientes();
   if(page==='config'){ carregarTelaConfig(); setTimeout(()=>{ carregarIntegracoes(); carregarAgenteConfig(); }, 50); }
+  if(page==='whatsapp') setTimeout(carregarChatsWA, 50);
 }
 
+// ══════════════════════════════════════════════
+// WHATSAPP REAL — integração UAZAPI GO v2
+// ══════════════════════════════════════════════
+let _waCurrentChat   = null; // chat ativo { id, phone, name }
+let _waChatsCache    = [];   // todos os chats carregados
+let _waPollingTimer  = null; // intervalo de polling
+
+function _waApiUrl(){ return getUazapiUrl(); }
+function _waApiToken(){ return getUazapiRealToken() || getUazapiInstance(); }
+
+function _waTsFmt(ts){
+  if(!ts) return '';
+  const d = new Date(ts > 9999999999 ? ts : ts * 1000);
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  if(d >= hoje) return d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const ontem = new Date(hoje); ontem.setDate(ontem.getDate()-1);
+  if(d >= ontem) return 'Ontem';
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+}
+
+function _waInitials(name){
+  if(!name) return '?';
+  const parts = name.trim().split(' ').filter(Boolean);
+  return (parts[0]?.[0]||'') + (parts[1]?.[0]||'');
+}
+
+const _waColors = ['#2e7d57','#3498db','#e67e22','#9b59b6','#e74c3c','#16a085','#8e44ad','#d35400'];
+function _waColor(name){ let h=0; for(const c of (name||''))h=c.charCodeAt(0)+((h<<5)-h); return _waColors[Math.abs(h)%_waColors.length]; }
+
+function _waFmtPhone(phone){
+  // normaliza: remove tudo que não é dígito
+  return (phone||'').replace(/\D/g,'');
+}
+
+async function carregarChatsWA(){
+  const url = _waApiUrl(); const tok = _waApiToken();
+  if(!url || !tok){ document.getElementById('wa-conv-list').innerHTML='<div style="padding:20px;text-align:center;font-size:13px;color:var(--text-muted)">⚠ Configure o WhatsApp em Configurações → Integrações</div>'; return; }
+  document.getElementById('wa-conv-list').innerHTML='<div style="padding:32px 16px;text-align:center;color:var(--text-muted);font-size:13px">⏳ Carregando...</div>';
+  try {
+    const r = await fetch(`${url}/chat/find`, { method:'POST', headers:{'Content-Type':'application/json','token':tok}, body:JSON.stringify({limit:50}) });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    _waChatsCache = data.chats || data || [];
+    _waRenderChats(_waChatsCache);
+    // atualiza badge do menu
+    const totalUnread = _waChatsCache.reduce((s,c)=>s+(c.wa_unreadCount||0),0);
+    document.querySelectorAll('.nav-badge').forEach(b=>{ if(b.closest('[onclick*="whatsapp"]')) b.textContent = totalUnread||''; });
+    // reinicia polling
+    clearInterval(_waPollingTimer);
+    _waPollingTimer = setInterval(_waPollingCheck, 8000);
+  } catch(e){
+    document.getElementById('wa-conv-list').innerHTML=`<div style="padding:20px;text-align:center;font-size:13px;color:#e74c3c">Erro ao carregar: ${e.message}</div>`;
+  }
+}
+
+function _waRenderChats(chats){
+  const lista = document.getElementById('wa-conv-list');
+  if(!lista) return;
+  if(!chats.length){ lista.innerHTML='<div style="padding:32px 16px;text-align:center;font-size:13px;color:var(--text-muted)">Nenhuma conversa encontrada</div>'; return; }
+  lista.innerHTML = chats.map(c => {
+    const nome = c.wa_contactName || c.wa_name || c.lead_name || c.lead_fullName || c.phone || 'Desconhecido';
+    const preview = c.wa_lastMessageTextVote || '';
+    const ts = _waTsFmt(c.wa_lastMsgTimestamp);
+    const unread = c.wa_unreadCount || 0;
+    const initials = _waInitials(nome).toUpperCase();
+    const cor = _waColor(nome);
+    const ativo = _waCurrentChat?.id === c.id ? 'active' : '';
+    return `<div class="wa-conv-item ${ativo}" onclick="abrirChatWA('${c.id}')">
+      <div class="wa-avatar" style="background:${cor}">${initials}</div>
+      <div class="wa-conv-info">
+        <div class="wa-conv-name">${nome}</div>
+        <div class="wa-conv-preview">${preview.slice(0,45)||'—'}</div>
+      </div>
+      <div class="wa-conv-meta">
+        <div class="wa-conv-time">${ts}</div>
+        ${unread ? `<div class="wa-unread">${unread}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarChatsWA(q){
+  if(!q){ _waRenderChats(_waChatsCache); return; }
+  const ql = q.toLowerCase();
+  _waRenderChats(_waChatsCache.filter(c => {
+    const n = (c.wa_contactName||c.wa_name||c.lead_name||c.lead_fullName||c.phone||'').toLowerCase();
+    return n.includes(ql);
+  }));
+}
+
+async function abrirChatWA(chatId){
+  const chat = _waChatsCache.find(c=>c.id===chatId);
+  if(!chat) return;
+  _waCurrentChat = chat;
+  // marca como ativo na lista
+  document.querySelectorAll('.wa-conv-item').forEach(el => el.classList.toggle('active', el.getAttribute('onclick')===`abrirChatWA('${chatId}')`));
+  const nome = chat.wa_contactName || chat.wa_name || chat.lead_name || chat.lead_fullName || chat.phone || 'Desconhecido';
+  const cor  = _waColor(nome);
+  const ini  = _waInitials(nome).toUpperCase();
+  const phone = _waFmtPhone(chat.phone || chat.wa_chatid || '');
+  // Monta o painel do chat
+  document.getElementById('wa-chat-panel').innerHTML = `
+    <div class="wa-chat-header">
+      <div class="wa-avatar" style="background:${cor};width:38px;height:38px;font-size:13px">${ini}</div>
+      <div class="wa-chat-info">
+        <div class="wa-chat-name">${nome}</div>
+        <div class="wa-chat-status">${phone ? '+' + phone : ''}</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="carregarMensagensWA('${chatId}')">🔄</button>
+      </div>
+    </div>
+    <div class="wa-messages" id="wa-msgs-area"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">⏳ Carregando mensagens...</div></div>
+    <div class="wa-input-area">
+      <button style="font-size:20px;background:none;border:none;cursor:pointer;color:var(--text-muted)">😊</button>
+      <textarea id="wa-msg-input" class="wa-input" rows="1" placeholder="Digite uma mensagem..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagemChatWA();}"></textarea>
+      <button class="wa-send-btn" onclick="enviarMensagemChatWA()">➤</button>
+    </div>`;
+  await carregarMensagensWA(chatId);
+}
+
+async function carregarMensagensWA(chatId){
+  const url = _waApiUrl(); const tok = _waApiToken();
+  const area = document.getElementById('wa-msgs-area');
+  if(!area) return;
+  try {
+    const r = await fetch(`${url}/message/find`, { method:'POST', headers:{'Content-Type':'application/json','token':tok}, body:JSON.stringify({chatId, limit:50}) });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const msgs = (data.messages || []).reverse(); // mais antigas primeiro
+    _waRenderMensagens(msgs, area);
+  } catch(e){
+    area.innerHTML = `<div style="padding:20px;text-align:center;font-size:13px;color:#e74c3c">Erro: ${e.message}</div>`;
+  }
+}
+
+function _waRenderMensagens(msgs, area){
+  if(!area) area = document.getElementById('wa-msgs-area');
+  if(!area) return;
+  if(!msgs.length){ area.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px">Sem mensagens</div>'; return; }
+  area.innerHTML = msgs.map(m => {
+    const txt  = m.content?.text || m.content?.caption || m.content?.conversation || '';
+    const tipo = m.fromMe ? 'sent' : 'received';
+    const ts   = _waTsFmt(m.messageTimestamp || m.ts);
+    const ticks = m.fromMe ? ' ✓✓' : '';
+    if(!txt && m.messageType && m.messageType !== 'Conversation' && m.messageType !== 'ExtendedTextMessage'){
+      return `<div class="wa-msg ${tipo}"><em style="color:var(--text-muted);font-size:11px">[${m.messageType}]</em><div class="wa-msg-time ${tipo}">${ts}${ticks}</div></div>`;
+    }
+    if(!txt) return '';
+    return `<div class="wa-msg ${tipo}">${txt.replace(/\n/g,'<br>')}<div class="wa-msg-time ${tipo}">${ts}${ticks}</div></div>`;
+  }).join('');
+  // scroll para o final
+  area.scrollTop = area.scrollHeight;
+}
+
+async function enviarMensagemChatWA(){
+  const input = document.getElementById('wa-msg-input');
+  const txt = input?.value?.trim();
+  if(!txt || !_waCurrentChat) return;
+  const url   = _waApiUrl();
+  const tok   = _waApiToken();
+  const phone = _waFmtPhone(_waCurrentChat.phone || _waCurrentChat.wa_chatid || '');
+  if(!phone){ toast('Telefone não encontrado para este contato','erro'); return; }
+  input.value = ''; input.style.height='auto';
+  // Adiciona mensagem otimisticamente
+  const area = document.getElementById('wa-msgs-area');
+  if(area){
+    const div = document.createElement('div');
+    div.className = 'wa-msg sent'; div.innerHTML = `${txt}<div class="wa-msg-time sent">${_waTsFmt(Date.now())} ⏳</div>`;
+    area.appendChild(div); area.scrollTop = area.scrollHeight;
+  }
+  try {
+    const r = await fetch(`${url}/send/text`, { method:'POST', headers:{'Content-Type':'application/json','token':tok}, body:JSON.stringify({number:phone, text:txt}) });
+    if(r.ok){
+      // atualiza o tick para ✓✓
+      const lastMsg = area?.querySelectorAll('.wa-msg.sent');
+      if(lastMsg?.length){ const last = lastMsg[lastMsg.length-1]; last.querySelector('.wa-msg-time').textContent = `${_waTsFmt(Date.now())} ✓✓`; }
+    } else {
+      toast('Erro ao enviar mensagem','erro');
+    }
+  } catch(e){ toast('Erro: '+e.message,'erro'); }
+}
+
+async function _waPollingCheck(){
+  if(!_waCurrentChat) return;
+  const url = _waApiUrl(); const tok = _waApiToken();
+  if(!url || !tok) return;
+  try {
+    // Verifica se há novas mensagens no chat atual
+    const r = await fetch(`${url}/message/find`, { method:'POST', headers:{'Content-Type':'application/json','token':tok}, body:JSON.stringify({chatId:_waCurrentChat.id, limit:10}) });
+    if(r.ok){
+      const data = await r.json();
+      const msgs = (data.messages||[]).reverse();
+      const area = document.getElementById('wa-msgs-area');
+      if(area && msgs.length){
+        const ultimaTela = area.querySelectorAll('.wa-msg:not([data-polling])').length;
+        if(msgs.length !== ultimaTela){
+          _waRenderMensagens(msgs, area);
+        }
+      }
+    }
+  } catch(e){ /* ignora erros de polling */ }
+}
+
+function abrirNovaConversaWA(){
+  document.getElementById('modal-nova-conversa-wa').classList.add('open');
+  setTimeout(()=>document.getElementById('nc-telefone')?.focus(),100);
+}
+
+async function enviarNovaConversaWA(){
+  const tel = document.getElementById('nc-telefone')?.value?.trim();
+  const msg = document.getElementById('nc-mensagem')?.value?.trim();
+  if(!tel){ toast('Informe o telefone','erro'); return; }
+  if(!msg){ toast('Informe uma mensagem','erro'); return; }
+  const phone = tel.replace(/\D/g,'');
+  const url = _waApiUrl(); const tok = _waApiToken();
+  try {
+    const r = await fetch(`${url}/send/text`, { method:'POST', headers:{'Content-Type':'application/json','token':tok}, body:JSON.stringify({number:phone, text:msg}) });
+    if(r.ok){
+      toast('✅ Mensagem enviada! Atualizando conversas...');
+      document.getElementById('modal-nova-conversa-wa').classList.remove('open');
+      document.getElementById('nc-telefone').value='';
+      document.getElementById('nc-mensagem').value='';
+      setTimeout(carregarChatsWA, 1500);
+    } else {
+      const err = await r.text();
+      toast('Erro ao enviar: '+err.slice(0,80),'erro');
+    }
+  } catch(e){ toast('Erro: '+e.message,'erro'); }
+}
+
+// ══════════════════════════════════════════════
 // ─── WEEKLY CALENDAR ───
 const SLOT_H = 60; // px per hour
 const HOURS_START = 7;
