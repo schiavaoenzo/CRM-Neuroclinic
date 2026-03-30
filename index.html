@@ -1715,6 +1715,10 @@ function navigate(page,navEl){
 let _waCurrentChat   = null; // chat ativo { id, phone, name }
 let _waChatsCache    = [];   // todos os chats carregados
 let _waPollingTimer  = null; // intervalo de polling
+let _waAgentChats    = {};   // chatId -> true/false (agente ativo neste chat)
+let _waLastMsgTs     = {};   // chatId -> timestamp da última msg vista (para detectar novas)
+let _waConvHistory   = {};   // chatId -> [{role:'user'|'assistant', content}] histórico para o Claude
+let _waAgentBusy     = {};   // chatId -> true enquanto o agente está processando (evita duplas)
 
 function _waApiUrl(){ return getUazapiUrl(); }
 function _waApiToken(){ return getUazapiRealToken() || getUazapiInstance(); }
@@ -1817,7 +1821,8 @@ async function abrirChatWA(chatId){
         <div class="wa-chat-name">${nome}</div>
         <div class="wa-chat-status">${phone ? '+' + phone : ''}</div>
       </div>
-      <div style="margin-left:auto;display:flex;gap:8px">
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <button id="btn-agente-wa" class="btn" style="font-size:12px;padding:6px 12px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text-muted)" onclick="toggleAgenteWA('${chatId}')">${_waAgentChats[chatId] ? '🤖 IA On' : '🤖 IA Off'}</button>
         <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="carregarMensagensWA('${chatId}')">🔄</button>
       </div>
     </div>
@@ -1840,6 +1845,11 @@ async function carregarMensagensWA(chatId){
     const data = await r.json();
     const msgs = (data.messages || []).reverse(); // mais antigas primeiro
     _waRenderMensagens(msgs, area);
+    // Inicializa o timestamp da última mensagem (para o agente só responder mensagens NOVAS)
+    if(msgs.length && !_waLastMsgTs[chatId]){
+      const ultima = msgs[msgs.length-1];
+      _waLastMsgTs[chatId] = ultima.messageTimestamp || ultima.ts || Math.floor(Date.now()/1000);
+    }
   } catch(e){
     area.innerHTML = `<div style="padding:20px;text-align:center;font-size:13px;color:#e74c3c">Erro: ${e.message}</div>`;
   }
@@ -1897,20 +1907,200 @@ async function _waPollingCheck(){
   const url = _waApiUrl(); const tok = _waApiToken();
   if(!url || !tok) return;
   try {
-    // Verifica se há novas mensagens no chat atual
-    const r = await fetch(`${url}/message/find`, { method:'POST', headers:{'Content-Type':'application/json','token':tok}, body:JSON.stringify({chatId:_waCurrentChat.id, limit:10}) });
+    const chatId = _waCurrentChat.id;
+    const r = await fetch(`${url}/message/find`, { method:'POST', headers:{'Content-Type':'application/json','token':tok}, body:JSON.stringify({chatId, limit:20}) });
     if(r.ok){
       const data = await r.json();
       const msgs = (data.messages||[]).reverse();
       const area = document.getElementById('wa-msgs-area');
       if(area && msgs.length){
         const ultimaTela = area.querySelectorAll('.wa-msg:not([data-polling])').length;
-        if(msgs.length !== ultimaTela){
-          _waRenderMensagens(msgs, area);
+        if(msgs.length !== ultimaTela) _waRenderMensagens(msgs, area);
+      }
+      // ── Detecta nova mensagem do paciente para acionar agente ──
+      if(msgs.length){
+        const ultima = msgs[msgs.length - 1];
+        const tsUltima = ultima.messageTimestamp || ultima.ts || 0;
+        const tsSalvo  = _waLastMsgTs[chatId] || 0;
+        // Nova mensagem recebida (não enviada por nós) e mais recente que a última salva
+        if(!ultima.fromMe && tsUltima > tsSalvo && tsSalvo > 0){
+          // Chama o agente se estiver ativo para este chat
+          if(_waAgentChats[chatId]){
+            const textoMsg = ultima.content?.text || ultima.content?.caption || ultima.content?.conversation || '';
+            if(textoMsg) _autoResponderWA(chatId, textoMsg, msgs);
+          }
         }
+        // Atualiza o timestamp da última msg vista
+        if(tsUltima > tsSalvo) _waLastMsgTs[chatId] = tsUltima;
       }
     }
   } catch(e){ /* ignora erros de polling */ }
+}
+
+// ── Toggle do Agente IA por conversa ──────────────────────────
+function toggleAgenteWA(chatId){
+  const key = getAnthropicKey();
+  if(!key){
+    toast('Configure a chave da Anthropic em Configurações → Integrações primeiro!', 'erro');
+    return;
+  }
+  _waAgentChats[chatId] = !_waAgentChats[chatId];
+  const btn = document.getElementById('btn-agente-wa');
+  const ativo = _waAgentChats[chatId];
+  if(btn){
+    btn.textContent = ativo ? '🤖 IA On' : '🤖 IA Off';
+    btn.style.background  = ativo ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color       = ativo ? '#fff' : 'var(--text-muted)';
+    btn.style.borderColor = ativo ? 'var(--accent)' : 'var(--border)';
+  }
+  // Inicializa o timestamp de controle para não responder msgs antigas
+  if(ativo){
+    const msgs = document.querySelectorAll('#wa-msgs-area .wa-msg');
+    // Marca o momento atual como baseline — só responderá msgs FUTURAS
+    _waLastMsgTs[chatId] = Math.floor(Date.now()/1000);
+    // Inicializa histórico de conversa com as mensagens atuais (contexto)
+    _waConvHistory[chatId] = _waGetHistoryFromDOM();
+    toast('✦ Agente IA ativado nesta conversa!');
+  } else {
+    toast('Agente IA desativado nesta conversa.');
+  }
+}
+
+// Extrai histórico de conversa do DOM atual (para dar contexto ao Claude)
+function _waGetHistoryFromDOM(){
+  const history = [];
+  document.querySelectorAll('#wa-msgs-area .wa-msg').forEach(el => {
+    const isSent = el.classList.contains('sent');
+    const timeEl = el.querySelector('.wa-msg-time');
+    let text = el.textContent;
+    if(timeEl) text = text.replace(timeEl.textContent, '').trim();
+    if(text && text !== '...') history.push({ role: isSent ? 'assistant' : 'user', content: text });
+  });
+  return history.slice(-20); // Últimas 20 mensagens como contexto
+}
+
+// ── Auto-Responder IA ─────────────────────────────────────────
+async function _autoResponderWA(chatId, textoRecebido, allMsgs){
+  if(_waAgentBusy[chatId]) return; // evita duplicata
+  const key = getAnthropicKey();
+  if(!key) return;
+  _waAgentBusy[chatId] = true;
+
+  // Monta histórico de conversa
+  if(!_waConvHistory[chatId]) _waConvHistory[chatId] = [];
+  _waConvHistory[chatId].push({ role:'user', content: textoRecebido });
+
+  // Pega configuração do agente salva pelo usuário
+  const cfg = JSON.parse(localStorage.getItem('crm_agente_config') || '{}');
+  const nomeAgente   = cfg.nome || 'Assistente NeuroClinic';
+  const modelo       = _waMapModel(cfg.modelo || 'claude-sonnet-4-6');
+  const temperatura  = cfg.criatividade ?? 0.7;
+  const promptCustom = cfg.prompt || '';
+  const clinica = getClinicaNome();
+
+  // Verifica horário de funcionamento
+  if(!cfg.h24){
+    const agora = new Date();
+    const hAtual = agora.getHours()*60 + agora.getMinutes();
+    const [hIni, mIni] = (cfg.horaInicio||'08:00').split(':').map(Number);
+    const [hFim, mFim] = (cfg.horaFim||'22:00').split(':').map(Number);
+    const inicio = hIni*60+mIni, fim = hFim*60+mFim;
+    const diaOk = !cfg.dias || cfg.dias[agora.getDay()];
+    if(hAtual < inicio || hAtual > fim || !diaOk){
+      const msgFora = cfg.msgFora || 'Olá! No momento estamos fora do horário de atendimento. Retornaremos em breve!';
+      if(msgFora){
+        await _waEnviarRespostaAgente(chatId, msgFora);
+        _waAgentBusy[chatId] = false;
+      }
+      return;
+    }
+  }
+
+  // System prompt do agente
+  const hoje = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+  const systemPrompt = promptCustom ||
+    `Você é ${nomeAgente}, assistente virtual da ${clinica}. Atenda pacientes pelo WhatsApp com gentileza e profissionalismo. Hoje é ${hoje}. Responda de forma curta e direta (máximo 3 parágrafos). Nunca dê diagnósticos ou orientações médicas. Quando o paciente quiser agendar, pergunte nome, data preferida e se é presencial ou online.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: modelo,
+        max_tokens: 500,
+        temperature: temperatura,
+        system: systemPrompt,
+        messages: _waConvHistory[chatId].slice(-16) // contexto das últimas 16 trocas
+      })
+    });
+
+    if(!resp.ok){
+      const err = await resp.json();
+      console.error('[Agente IA] Erro Claude:', err);
+      _waAgentBusy[chatId] = false;
+      return;
+    }
+
+    const data = await resp.json();
+    const resposta = data.content?.[0]?.text;
+    if(!resposta){ _waAgentBusy[chatId] = false; return; }
+
+    // Adiciona ao histórico
+    _waConvHistory[chatId].push({ role:'assistant', content: resposta });
+
+    // Pequena pausa (simula digitação natural)
+    await new Promise(r => setTimeout(r, 800 + Math.random()*700));
+
+    // Envia pelo WhatsApp
+    await _waEnviarRespostaAgente(chatId, resposta);
+
+  } catch(e){
+    console.error('[Agente IA] Erro:', e);
+  }
+  _waAgentBusy[chatId] = false;
+}
+
+async function _waEnviarRespostaAgente(chatId, texto){
+  const chat = _waChatsCache.find(c=>c.id===chatId);
+  if(!chat) return;
+  const phone = _waFmtPhone(chat.phone || chat.wa_chatid || '');
+  if(!phone) return;
+  const url = _waApiUrl(); const tok = _waApiToken();
+  try {
+    const r = await fetch(`${url}/send/text`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','token':tok},
+      body: JSON.stringify({ number: phone, text: texto })
+    });
+    if(r.ok){
+      // Se é o chat ativo, mostra a mensagem na tela também
+      if(_waCurrentChat?.id === chatId){
+        const area = document.getElementById('wa-msgs-area');
+        if(area){
+          const div = document.createElement('div');
+          div.className = 'wa-msg sent';
+          div.innerHTML = `${texto.replace(/\n/g,'<br>')} <div class="wa-msg-time sent">${_waTsFmt(Date.now())} 🤖✓</div>`;
+          area.appendChild(div);
+          area.scrollTop = area.scrollHeight;
+        }
+      }
+    }
+  } catch(e){ console.error('[Agente] Erro ao enviar:', e); }
+}
+
+// Mapeia o nome do modelo salvo no config para o ID correto da API
+function _waMapModel(modelo){
+  const map = {
+    'claude-sonnet-4-6':          'claude-sonnet-4-5',
+    'claude-opus-4-6':            'claude-opus-4-5',
+    'claude-haiku-4-5-20251001':  'claude-haiku-4-5',
+  };
+  return map[modelo] || 'claude-sonnet-4-5';
 }
 
 function abrirNovaConversaWA(){
@@ -2506,45 +2696,69 @@ function setStage(btn){
 }
 
 // AI AGENT
+let _agentChatHistory = []; // histórico da sessão de chat do painel Agente IA
+
 async function sendAgentMessage(){
   const key = getAnthropicKey();
-  if(!key){ addAgentMessage('⚠ API key não configurada. Vá em Configurações e insira sua chave da Anthropic.','agent'); return; }
+  if(!key){ addAgentMessage('⚠ API key não configurada. Vá em Configurações → Integrações e insira sua chave da Anthropic (sk-ant-...).','agent'); return; }
   const input=document.getElementById('agent-input');
   const msg=input.value.trim();if(!msg)return;
   addAgentMessage(msg,'user');input.value='';
   const loading=addAgentMessage('...','agent',true);
 
+  // Pega configuração do agente
+  const cfg = JSON.parse(localStorage.getItem('crm_agente_config')||'{}');
+  const modelo      = _waMapModel(cfg.modelo || 'claude-sonnet-4-6');
+  const temperatura = cfg.criatividade ?? 0.7;
+  const promptCustom = cfg.prompt || '';
+
   // Contexto dinâmico do banco
   const hoje = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-  const { data: stats } = await sb.from('pacientes').select('id, status').limit(1000);
-  const nAtivos = (stats||[]).filter(p=>['ativo','retorno'].includes(p.status)).length;
-  const nLeads  = (stats||[]).filter(p=>['lead','novo'].includes(p.status)).length;
-  const { data: hojeConsultas } = await sb.from('consultas')
-    .select('*, pacientes(nome,sobrenome), profissionais(nome)')
-    .gte('data_hora_inicio', isoDate(new Date())+'T00:00:00')
-    .lte('data_hora_inicio', isoDate(new Date())+'T23:59:59')
-    .neq('status','cancelada').order('data_hora_inicio');
-  const agendaStr = (hojeConsultas||[]).map(c=>{
-    const h = new Date(c.data_hora_inicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    const p = c.pacientes ? `${c.pacientes.nome} ${c.pacientes.sobrenome}` : c.titulo||'—';
-    return `${h} ${p} (${c.profissionais?.nome||''})`;
-  }).join(', ') || 'Nenhuma consulta hoje';
+  let agendaStr = 'Sem consultas hoje';
+  let nAtivos = 0, nLeads = 0;
+  try{
+    const { data: stats } = await sb.from('pacientes').select('id, status').limit(1000);
+    nAtivos = (stats||[]).filter(p=>['ativo','retorno'].includes(p.status)).length;
+    nLeads  = (stats||[]).filter(p=>['lead','novo'].includes(p.status)).length;
+    const { data: hojeConsultas } = await sb.from('consultas')
+      .select('*, pacientes(nome,sobrenome), profissionais(nome)')
+      .gte('data_hora_inicio', isoDate(new Date())+'T00:00:00')
+      .lte('data_hora_inicio', isoDate(new Date())+'T23:59:59')
+      .neq('status','cancelada').order('data_hora_inicio');
+    agendaStr = (hojeConsultas||[]).map(c=>{
+      const h = new Date(c.data_hora_inicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      const p = c.pacientes ? `${c.pacientes.nome} ${c.pacientes.sobrenome}` : c.titulo||'—';
+      return `${h} ${p} (${c.profissionais?.nome||''})`;
+    }).join(', ') || 'Nenhuma consulta hoje';
+  }catch(e){ /* sem banco, continua */ }
 
   const clinica = getClinicaNome();
-  const systemPrompt = `Você é o agente de IA da ${clinica}, clínica neurológica em São Paulo. Responda em português, de forma concisa e profissional.
-Hoje: ${hoje}.
-Agenda de hoje: ${agendaStr}.
-Total: ${nAtivos} pacientes ativos, ${nLeads} leads no pipeline.
+  const nomeAgente = cfg.nome || 'Agente NeuroClinic';
+  const systemPrompt = promptCustom ||
+    `Você é ${nomeAgente} da ${clinica}, clínica neurológica em São Paulo. Responda em português, de forma concisa e profissional.
+Hoje: ${hoje}. Agenda: ${agendaStr}. Total: ${nAtivos} pacientes ativos, ${nLeads} leads no pipeline.
 Você tem acesso a dados de pacientes, agenda e pipeline. Responda com base nesses dados quando possível.`;
+
+  // Mantém histórico da conversa no painel
+  _agentChatHistory.push({ role:'user', content: msg });
 
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:systemPrompt,messages:[{role:'user',content:msg}]})
+      body:JSON.stringify({
+        model: modelo,
+        max_tokens: 1200,
+        temperature: temperatura,
+        system: systemPrompt,
+        messages: _agentChatHistory.slice(-20)
+      })
     });
-    const data=await resp.json();loading.remove();
-    addAgentMessage(data.content?.[0]?.text||'Não consegui processar.','agent');
+    const data=await resp.json();
+    loading.remove();
+    const resposta = data.content?.[0]?.text || 'Não consegui processar.';
+    _agentChatHistory.push({ role:'assistant', content: resposta });
+    addAgentMessage(resposta,'agent');
   }catch(e){loading.remove();addAgentMessage('Erro de conexão: '+e.message,'agent');}
 }
 function addAgentMessage(text,role,isLoading=false){
