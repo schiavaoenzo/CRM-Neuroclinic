@@ -657,7 +657,8 @@
     <div id="page-whatsapp" class="page">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
         <h2 style="font-family:'DM Serif Display',serif;font-size:22px">WhatsApp Clínica</h2>
-        <div style="margin-left:auto;display:flex;gap:8px">
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <button id="btn-agente-global" class="btn" style="font-size:12.5px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text-muted)" onclick="toggleAgenteGlobal()">🌐 Agente Global: Off</button>
           <button class="btn btn-ghost" style="font-size:12.5px" onclick="carregarChatsWA()">🔄 Atualizar</button>
           <button class="btn btn-primary" style="font-size:12.5px" onclick="abrirNovaConversaWA()">+ Nova conversa</button>
         </div>
@@ -1715,10 +1716,12 @@ function navigate(page,navEl){
 let _waCurrentChat   = null; // chat ativo { id, phone, name }
 let _waChatsCache    = [];   // todos os chats carregados
 let _waPollingTimer  = null; // intervalo de polling
-let _waAgentChats    = {};   // chatId -> true/false (agente ativo neste chat)
+let _waAgentChats    = {};   // chatId -> true=forçado ON | false=forçado OFF | undefined=segue global
 let _waLastMsgTs     = {};   // chatId -> timestamp da última msg vista (para detectar novas)
 let _waConvHistory   = {};   // chatId -> [{role:'user'|'assistant', content}] histórico para o Claude
 let _waAgentBusy     = {};   // chatId -> true enquanto o agente está processando (evita duplas)
+let _waAgentGlobal   = false; // modo global: responde TODAS as conversas automaticamente
+let _waGlobalTimer   = null;  // intervalo de polling global (verifica todos os chats)
 
 function _waApiUrl(){ return getUazapiUrl(); }
 function _waApiToken(){ return getUazapiRealToken() || getUazapiInstance(); }
@@ -1822,7 +1825,7 @@ async function abrirChatWA(chatId){
         <div class="wa-chat-status">${phone ? '+' + phone : ''}</div>
       </div>
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-        <button id="btn-agente-wa" class="btn" style="font-size:12px;padding:6px 12px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text-muted)" onclick="toggleAgenteWA('${chatId}')">${_waAgentChats[chatId] ? '🤖 IA On' : '🤖 IA Off'}</button>
+        <button id="btn-agente-wa" class="btn" style="font-size:12px;padding:6px 12px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text-muted)" onclick="toggleAgenteWA('${chatId}')">🤖 IA</button>
         <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="carregarMensagensWA('${chatId}')">🔄</button>
       </div>
     </div>
@@ -1850,6 +1853,8 @@ async function carregarMensagensWA(chatId){
       const ultima = msgs[msgs.length-1];
       _waLastMsgTs[chatId] = ultima.messageTimestamp || ultima.ts || Math.floor(Date.now()/1000);
     }
+    // Atualiza visual do botão de agente deste chat
+    setTimeout(_waAtualizarBtnAgenteChat, 50);
   } catch(e){
     area.innerHTML = `<div style="padding:20px;text-align:center;font-size:13px;color:#e74c3c">Erro: ${e.message}</div>`;
   }
@@ -1924,8 +1929,8 @@ async function _waPollingCheck(){
         const tsSalvo  = _waLastMsgTs[chatId] || 0;
         // Nova mensagem recebida (não enviada por nós) e mais recente que a última salva
         if(!ultima.fromMe && tsUltima > tsSalvo && tsSalvo > 0){
-          // Chama o agente se estiver ativo para este chat
-          if(_waAgentChats[chatId]){
+          // Usa lógica centralizada: global ON + não pausado, OU individual ON
+          if(_waAgenteAtivoParaChat(chatId)){
             const textoMsg = ultima.content?.text || ultima.content?.caption || ultima.content?.conversation || '';
             if(textoMsg) _autoResponderWA(chatId, textoMsg, msgs);
           }
@@ -1937,33 +1942,160 @@ async function _waPollingCheck(){
   } catch(e){ /* ignora erros de polling */ }
 }
 
-// ── Toggle do Agente IA por conversa ──────────────────────────
+// ── Toggle Agente Global (todas as conversas) ─────────────────
+function toggleAgenteGlobal(){
+  const key = getAnthropicKey();
+  if(!key){
+    toast('Configure a chave da Anthropic em Configurações → Integrações primeiro!','erro');
+    return;
+  }
+  _waAgentGlobal = !_waAgentGlobal;
+  const btn = document.getElementById('btn-agente-global');
+  if(btn){
+    btn.textContent    = _waAgentGlobal ? '🌐 Agente Global: On' : '🌐 Agente Global: Off';
+    btn.style.background  = _waAgentGlobal ? '#2d5a4e' : 'var(--surface2)';
+    btn.style.color       = _waAgentGlobal ? '#fff'    : 'var(--text-muted)';
+    btn.style.borderColor = _waAgentGlobal ? '#2d5a4e' : 'var(--border)';
+  }
+  if(_waAgentGlobal){
+    // Marca timestamp atual em todos os chats carregados (só responde msgs FUTURAS)
+    _waChatsCache.forEach(c => {
+      if(!_waLastMsgTs[c.id]) _waLastMsgTs[c.id] = Math.floor(Date.now()/1000);
+    });
+    // Inicia polling global a cada 15 segundos
+    clearInterval(_waGlobalTimer);
+    _waGlobalTimer = setInterval(_waGlobalPollingCheck, 15000);
+    toast('🌐 Agente Global ativado — respondendo todas as conversas!');
+  } else {
+    clearInterval(_waGlobalTimer);
+    _waGlobalTimer = null;
+    toast('Agente Global desativado.');
+  }
+  // Atualiza botão do chat aberto, se houver
+  _waAtualizarBtnAgenteChat();
+}
+
+// Retorna true se o agente deve responder este chatId
+function _waAgenteAtivoParaChat(chatId){
+  if(_waAgentChats[chatId] === false) return false;   // explicitamente DESLIGADO pelo humano
+  if(_waAgentChats[chatId] === true)  return true;    // explicitamente LIGADO individualmente
+  return _waAgentGlobal;                               // segue o global
+}
+
+// Atualiza visual do botão do chat atualmente aberto
+function _waAtualizarBtnAgenteChat(){
+  const btn = document.getElementById('btn-agente-wa');
+  if(!btn || !_waCurrentChat) return;
+  const chatId = _waCurrentChat.id;
+  const ativo = _waAgenteAtivoParaChat(chatId);
+  const foiManual = _waAgentChats[chatId] === false; // humano desligou manualmente
+  if(ativo){
+    btn.textContent    = '🤖 IA On';
+    btn.style.background  = 'var(--accent)';
+    btn.style.color       = '#fff';
+    btn.style.borderColor = 'var(--accent)';
+  } else if(foiManual && _waAgentGlobal){
+    btn.textContent    = '🤖 IA Pausado';
+    btn.style.background  = '#e67e22';
+    btn.style.color       = '#fff';
+    btn.style.borderColor = '#e67e22';
+  } else {
+    btn.textContent    = '🤖 IA Off';
+    btn.style.background  = 'var(--surface2)';
+    btn.style.color       = 'var(--text-muted)';
+    btn.style.borderColor = 'var(--border)';
+  }
+}
+
+// ── Toggle do Agente IA por conversa (liga/desliga/pausa) ─────
 function toggleAgenteWA(chatId){
   const key = getAnthropicKey();
   if(!key){
     toast('Configure a chave da Anthropic em Configurações → Integrações primeiro!', 'erro');
     return;
   }
-  _waAgentChats[chatId] = !_waAgentChats[chatId];
-  const btn = document.getElementById('btn-agente-wa');
-  const ativo = _waAgentChats[chatId];
-  if(btn){
-    btn.textContent = ativo ? '🤖 IA On' : '🤖 IA Off';
-    btn.style.background  = ativo ? 'var(--accent)' : 'var(--surface2)';
-    btn.style.color       = ativo ? '#fff' : 'var(--text-muted)';
-    btn.style.borderColor = ativo ? 'var(--accent)' : 'var(--border)';
-  }
-  // Inicializa o timestamp de controle para não responder msgs antigas
-  if(ativo){
-    const msgs = document.querySelectorAll('#wa-msgs-area .wa-msg');
-    // Marca o momento atual como baseline — só responderá msgs FUTURAS
+  const ativoAtual = _waAgenteAtivoParaChat(chatId);
+
+  if(ativoAtual){
+    // Estava ON → desliga/pausa manualmente
+    _waAgentChats[chatId] = false;
+    toast('👤 Agente pausado nesta conversa — atendimento manual.');
+  } else {
+    // Estava OFF/pausado → liga individualmente
+    _waAgentChats[chatId] = true;
+    // Marca timestamp baseline para não responder msgs antigas
     _waLastMsgTs[chatId] = Math.floor(Date.now()/1000);
-    // Inicializa histórico de conversa com as mensagens atuais (contexto)
     _waConvHistory[chatId] = _waGetHistoryFromDOM();
     toast('✦ Agente IA ativado nesta conversa!');
-  } else {
-    toast('Agente IA desativado nesta conversa.');
   }
+  _waAtualizarBtnAgenteChat();
+}
+
+// ── Polling Global: verifica TODOS os chats por novas mensagens ─
+async function _waGlobalPollingCheck(){
+  if(!_waAgentGlobal) return;
+  const url = _waApiUrl(); const tok = _waApiToken();
+  if(!url || !tok) return;
+  try {
+    // Busca lista de chats atualizada
+    const r = await fetch(`${url}/chat/find`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','token':tok},
+      body: JSON.stringify({limit:50})
+    });
+    if(!r.ok) return;
+    const data = await r.json();
+    const chats = Array.isArray(data) ? data : (data.chats || data.data || []);
+    // Atualiza cache de chats
+    if(chats.length) _waChatsCache = chats;
+
+    // Para cada chat, verifica se há nova mensagem recebida
+    for(const chat of chats){
+      const chatId = chat.id || chat.wa_chatid || chat.chatId;
+      if(!chatId) continue;
+      if(!_waAgenteAtivoParaChat(chatId)) continue;
+      if(_waAgentBusy[chatId]) continue;
+
+      // Timestamp da última mensagem do chat (campo varia na API)
+      const tsChat = chat.lastMessage?.messageTimestamp || chat.wa_messageTimestamp
+                   || chat.messageTimestamp || chat.lastMessageTimestamp || 0;
+      const tsSalvo = _waLastMsgTs[chatId] || 0;
+
+      // Só processa se há mensagem mais recente que a última vista
+      if(tsChat <= tsSalvo) continue;
+
+      // Busca as últimas mensagens deste chat
+      const rm = await fetch(`${url}/message/find`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','token':tok},
+        body: JSON.stringify({chatId, limit:10})
+      });
+      if(!rm.ok) continue;
+      const dm = await rm.json();
+      const msgs = (dm.messages||[]).reverse();
+      if(!msgs.length) continue;
+
+      const ultima = msgs[msgs.length-1];
+      const tsUltima = ultima.messageTimestamp || ultima.ts || 0;
+      if(ultima.fromMe || tsUltima <= tsSalvo) {
+        _waLastMsgTs[chatId] = tsUltima || tsChat;
+        continue;
+      }
+
+      const textoMsg = ultima.content?.text || ultima.content?.caption || ultima.content?.conversation || '';
+      if(!textoMsg) { _waLastMsgTs[chatId] = tsUltima; continue; }
+
+      // Aciona o agente para este chat
+      _waLastMsgTs[chatId] = tsUltima;
+      _autoResponderWA(chatId, textoMsg, msgs);
+
+      // Se for o chat aberto, atualiza a tela
+      if(_waCurrentChat?.id === chatId){
+        const area = document.getElementById('wa-msgs-area');
+        if(area) _waRenderMensagens(msgs, area);
+      }
+    }
+  } catch(e){ /* ignora erros silenciosamente */ }
 }
 
 // Extrai histórico de conversa do DOM atual (para dar contexto ao Claude)
